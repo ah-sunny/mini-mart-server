@@ -124,8 +124,7 @@ async function run() {
       res.send(result)
     })
 
-    //
-
+    //all product fetch for public
     app.get('/all-product', async (req, res) => {
 
       const { title, sort, category, brand, page = 1, limit = 9 } = req.query;
@@ -168,6 +167,8 @@ async function run() {
 
       res.json({ allProductList, brands, categorys, totalProduct })
     })
+
+
 
 
     app.get("/my-product/:email", verifyToken, verifySeller, async (req, res) => {
@@ -231,6 +232,8 @@ async function run() {
     });
 
 
+
+
     // //wishlist for buyer
     app.patch("/wishlist/add",  async (req, res) => {
       const { email, productID } = req.query
@@ -291,12 +294,26 @@ async function run() {
       );
         res.send(result)
     })
+    //remove from cart
+    app.patch("/cart/remove",  async (req, res) => {
+      const { email, productID } = req.query
+
+      //remove from  cart
+      const result = await userCollection.updateOne(
+        { email: email },
+        { $pull: { cart: new ObjectId (productID) } }
+
+      );
+        res.send(result)
+    })
+
+
 
 
 
 
     // number of cart
-    app.get("/cart", async(req,res)=>{
+    app.get("/cart",verifyToken,verifyBuyer, async(req,res)=>{
       const { email } = req.query;
      
       const user = await userCollection.findOne(
