@@ -53,6 +53,17 @@ const verifyBuyer = async (req, res, next) => {
   }
   next();
 }
+// use verify admin after verifyToken
+const verifyAdmin = async (req, res, next) => {
+  const email = req.decoded.email;
+  const query = { email: email };
+  const user = await userCollection.findOne(query);
+  const isAdmin = user?.role === 'admin';
+  if (!isAdmin) {
+    return res.status(403).send({ message: 'forbidden access' });
+  }
+  next();
+}
 
 //mongodeb
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.sy54hal.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -235,76 +246,76 @@ async function run() {
 
 
     // //wishlist for buyer
-    app.patch("/wishlist/add",  async (req, res) => {
+    app.patch("/wishlist/add", async (req, res) => {
       const { email, productID } = req.query
 
-       // Check if the productID already exists or not
-    const user = await userCollection.findOne({
-      email: email,
-      wishlist: new ObjectId(productID),   // Check for the product in the wishlist
-    });
+      // Check if the productID already exists or not
+      const user = await userCollection.findOne({
+        email: email,
+        wishlist: new ObjectId(productID),   // Check for the product in the wishlist
+      });
 
-    if (user) {
-      // console.log("Product is already in your wishlist.")
-      return res.status(409).json({ message: "Product is already in your wishlist." });
-    }
+      if (user) {
+        // console.log("Product is already in your wishlist.")
+        return res.status(409).json({ message: "Product is already in your wishlist." });
+      }
       //add into wishlist
       const result = await userCollection.updateOne(
         { email: email },
-        { $addToSet: { wishlist: new ObjectId (productID) } }
+        { $addToSet: { wishlist: new ObjectId(productID) } }
 
       );
-        res.send(result)
+      res.send(result)
     })
 
     //wishlist remove
-    app.patch("/wishlist/remove",  async (req, res) => {
+    app.patch("/wishlist/remove", async (req, res) => {
       const { email, productID } = req.query
 
       //remove from wishlist
       const result = await userCollection.updateOne(
         { email: email },
-        { $pull: { wishlist: new ObjectId (productID) } }
+        { $pull: { wishlist: new ObjectId(productID) } }
 
       );
-        res.send(result)
+      res.send(result)
     })
 
 
 
     //cart  for buyer
-    app.patch("/cart/add",  async (req, res) => {
+    app.patch("/cart/add", async (req, res) => {
       const { userEmail, productID } = req.query
 
-       // Check if the productID already exists or not
-    const user = await userCollection.findOne({
-      email: userEmail,
-      cart: new ObjectId(productID),   // Check for the product in the cart
-    });
+      // Check if the productID already exists or not
+      const user = await userCollection.findOne({
+        email: userEmail,
+        cart: new ObjectId(productID),   // Check for the product in the cart
+      });
 
-    if (user) {
-      // console.log("Product is already in your cart.")
-      return res.status(409).json({ message: "Product is already in your cart." });
-    }
+      if (user) {
+        // console.log("Product is already in your cart.")
+        return res.status(409).json({ message: "Product is already in your cart." });
+      }
       //add into cart
       const result = await userCollection.updateOne(
         { email: userEmail },
-        { $addToSet: { cart: new ObjectId (productID) } }
+        { $addToSet: { cart: new ObjectId(productID) } }
 
       );
-        res.send(result)
+      res.send(result)
     })
     //remove from cart
-    app.patch("/cart/remove",  async (req, res) => {
+    app.patch("/cart/remove", async (req, res) => {
       const { email, productID } = req.query
 
       //remove from  cart
       const result = await userCollection.updateOne(
         { email: email },
-        { $pull: { cart: new ObjectId (productID) } }
+        { $pull: { cart: new ObjectId(productID) } }
 
       );
-        res.send(result)
+      res.send(result)
     })
 
 
@@ -313,9 +324,9 @@ async function run() {
 
 
     // number of cart
-    app.get("/cart",verifyToken,verifyBuyer, async(req,res)=>{
+    app.get("/cart", verifyToken, verifyBuyer, async (req, res) => {
       const { email } = req.query;
-     
+
       const user = await userCollection.findOne(
         { email: email },
       );
@@ -323,23 +334,23 @@ async function run() {
         return res.status(404).json({ message: "User not found." });
       }
       // Count the number of items in the cart
-    const cartCount = user.cart?.length || 0;
-    //get array of cart 
-    const cartList = await productCollection
-    .find({_id: {$in: user?.cart || []} })
-    .toArray()
+      const cartCount = user.cart?.length || 0;
+      //get array of cart 
+      const cartList = await productCollection
+        .find({ _id: { $in: user?.cart || [] } })
+        .toArray()
 
-    // console.log("cart fill data: ",cartList)
+      // console.log("cart fill data: ",cartList)
 
-    res.status(200).json({cartCount, cartList });
+      res.status(200).json({ cartCount, cartList });
 
 
-    } )
+    })
 
     //wishlist
-    app.get("/wishlist",verifyToken,verifyBuyer,async(req,res)=>{
+    app.get("/wishlist", verifyToken, verifyBuyer, async (req, res) => {
       const { email } = req.query;
-     
+
       const user = await userCollection.findOne(
         { email: email },
       );
@@ -347,14 +358,56 @@ async function run() {
         return res.status(404).json({ message: "User not found." });
       }
 
-    //get array of wish 
-    const wishList = await productCollection
-    .find({_id: {$in: user?.wishlist || []} })
-    .toArray()
-    res.status(200).json({ wishList });
+      //get array of wish 
+      const wishList = await productCollection
+        .find({ _id: { $in: user?.wishlist || [] } })
+        .toArray()
+      res.status(200).json({ wishList });
 
 
-    } )
+    })
+
+
+    //admin
+    app.get('/all-users', verifyToken, verifyAdmin, async (req, res) => {
+      const { email } = req.query
+      console.log("want all user: : - ", email)
+      //   if (email !== req.decoded.email) {
+      //     return res.status(403).send({ message: 'forbidden access' })
+      // }
+      const result = await userCollection.find({}).toArray()
+      res.send(result)
+    })
+
+    //user delete by admin
+    app.delete('/delete-user', verifyToken, verifyAdmin, async (req, res) => {
+      const { email, userId } = req.query;
+      //verify
+      if (email != req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      const query = { _id: new ObjectId(String(userId)) }
+      const result = await userCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    //user role update
+    app.patch('/promote-user',verifyToken,verifyAdmin, async (req, res) => {
+      const { email, userId } = req.query;
+      const updateRole = req.body;
+      //verify user
+      if (email != req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+
+      // Update the user's role 
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(userId) }, // Find user by userId
+        { $set: { role: updateRole?.role } }   // promote the role 
+      );
+
+      res.send(result);
+    })
 
 
 
